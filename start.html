@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>My To-Do</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f3f3f3; }
+    input[type="text"] { width: 70%; padding: 10px; }
+    button { padding: 10px; }
+    ul { list-style: none; padding-left: 0; }
+    li { background: white; margin: 5px 0; padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+    .done { text-decoration: line-through; color: gray; }
+  </style>
+</head>
+<body>
+
+<h2>📝 Ваш To-Do лист</h2>
+
+<input type="text" id="taskInput" placeholder="Новая задача">
+<button onclick="addTask()">Добавить</button>
+
+<ul id="taskList"></ul>
+
+<script>
+  let tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
+
+  function saveTasks() {
+    localStorage.setItem("tasks", JSON.stringify(tasks));
+  }
+
+  function renderTasks() {
+    const list = document.getElementById("taskList");
+    list.innerHTML = "";
+    tasks.forEach((task, index) => {
+      const li = document.createElement("li");
+      li.className = task.done ? "done" : "";
+      li.innerHTML = `
+        <span onclick="toggleTask(${index})">${task.text}</span>
+        <button onclick="deleteTask(${index})">🗑️</button>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  function addTask() {
+    const input = document.getElementById("taskInput");
+    const text = input.value.trim();
+    if (text !== "") {
+      tasks.push({ text, done: false });
+      input.value = "";
+      saveTasks();
+      renderTasks();
+    }
+  }
+
+  function toggleTask(index) {
+    tasks[index].done = !tasks[index].done;
+    saveTasks();
+    renderTasks();
+  }
+
+  function deleteTask(index) {
+    tasks.splice(index, 1);
+    saveTasks();
+    renderTasks();
+  }
+
+  renderTasks();
+</script>
+
+</body>
+</html>
