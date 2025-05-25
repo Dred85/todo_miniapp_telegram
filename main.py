@@ -1,11 +1,12 @@
 # 8185492514:AAFk9oJ-t0_gabUTdTH1vt2Hp2xRHmEGysU
+from datetime import datetime
+
 from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime
 import sqlite3
 import os
 import asyncio
@@ -61,13 +62,24 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-# Модели данных
 class TodoItem(BaseModel):
     id: Optional[int] = None
     title: str
     description: Optional[str] = None
     completed: bool = False
-    created_at: datetime = datetime.now()
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    @classmethod
+    def from_db(cls, row):
+        return cls(
+            id=row[0],
+            title=row[1],
+            description=row[2],
+            completed=bool(row[3]),
+            created_at=datetime.strptime(row[4], "%Y-%m-%d %H:%M:%S") if row[4] else datetime.now(),
+            completed_at=datetime.strptime(row[5], "%Y-%m-%d %H:%M:%S") if row[5] else None
+        )
 
 # Инициализация базы данных
 def init_db():
@@ -79,9 +91,12 @@ def init_db():
             title TEXT NOT NULL,
             description TEXT,
             completed BOOLEAN NOT NULL DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            completed_at DATETIME
         )
     ''')
+    # Устанавливаем формат вывода времени в формате ISO
+    c.execute('PRAGMA datetime_format = "iso8601"')
     conn.commit()
     conn.close()
 
@@ -94,9 +109,14 @@ async def get_todos():
     conn = sqlite3.connect('todos.db')
     c = conn.cursor()
     c.execute('SELECT * FROM todos ORDER BY created_at DESC')
-    todos = [TodoItem(id=row[0], title=row[1], description=row[2], 
-                     completed=bool(row[3]), created_at=row[4]) 
-             for row in c.fetchall()]
+    todos = []
+    for row in c.fetchall():
+        try:
+            todo = TodoItem.from_db(row)
+            todos.append(todo)
+        except Exception as e:
+            print(f"Error parsing todo {row[0]}: {e}")
+            continue
     conn.close()
     return todos
 
@@ -104,25 +124,41 @@ async def get_todos():
 async def create_todo(todo: TodoItem):
     conn = sqlite3.connect('todos.db')
     c = conn.cursor()
+
+    # Вставляем задачу, не указывая created_at — оно выставится по умолчанию
     c.execute('''
-        INSERT INTO todos (title, description, completed, created_at)
-        VALUES (?, ?, ?, ?)
-    ''', (todo.title, todo.description, todo.completed, todo.created_at))
+        INSERT INTO todos (title, description, completed)
+        VALUES (?, ?, ?)
+    ''', (todo.title, todo.description, todo.completed))
     conn.commit()
-    todo.id = c.lastrowid
+
+    # Получаем только что вставленную задачу
+    last_id = c.lastrowid
+    c.execute('SELECT * FROM todos WHERE id = ?', (last_id,))
+    row = c.fetchone()
     conn.close()
-    return todo
+
+    # Преобразуем результат в модель TodoItem и возвращаем
+    return TodoItem.from_db(row)
 
 @app.put("/todos/{todo_id}", response_model=TodoItem)
+
+
 async def update_todo(todo_id: int, todo: TodoItem):
     conn = sqlite3.connect('todos.db')
     c = conn.cursor()
+    print(f"Updating todo {todo_id} with data: {todo.dict()}")  # Логируем входные данные
+    current_time = datetime.now().isoformat()
     c.execute('''
         UPDATE todos
-        SET title = ?, description = ?, completed = ?
+        SET title = ?, description = ?, completed = ?,
+            completed_at = CASE WHEN completed = 0 AND ? = 1 THEN ? ELSE completed_at END
         WHERE id = ?
-    ''', (todo.title, todo.description, todo.completed, todo_id))
+    ''', (todo.title, todo.description, todo.completed, todo.completed,
+          current_time if todo.completed else None,
+          todo_id))
     conn.commit()
+    print(f"Rows affected: {c.rowcount}")  # Логируем количество обновленных строк
     conn.close()
     todo.id = todo_id
     return todo
