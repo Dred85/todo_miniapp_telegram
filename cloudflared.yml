@@ -1,0 +1,16 @@
+tunnel: frontend
+credentials-file: /home/dred/.cloudflared/cert.json
+ingress:
+  - hostname: "*
+    service: http://localhost:3000
+  - service: http_status:404
+originRequest:
+  noTLSVerify: true
+  connectTimeout: 10s
+  noSNICheck: true
+  noChunkedEncoding: true
+  http2Origin: true
+loglevel: debug
+transport-loglevel: debug
+metrics: :8081
+metrics-update-freq: 5s
