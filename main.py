@@ -172,9 +172,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await update.callback_query.answer("Произошла ошибка. Пожалуйста, попробуйте позже.")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
 
 button = InlineKeyboardButton(
     text="Открыть To-Do",
-    web_app=WebAppInfo(url="https://yourdomain.com/todo")
+    web_app=WebAppInfo(url=WEBAPP_URL + "/todo")
 )

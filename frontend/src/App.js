@@ -19,7 +19,7 @@ import { Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import axios from 'axios';
 import WebApp from '@twa-dev/sdk';
 
-const API_URL = 'https://6f646806f9a5e8427c0240b31ca34418.serveo.net:8000';
+const API_URL = 'http://localhost:8000';
 
 function App() {
   const [todos, setTodos] = useState([]);
